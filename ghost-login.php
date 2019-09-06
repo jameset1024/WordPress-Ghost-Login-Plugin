@@ -127,23 +127,6 @@ function ghostCookieCheck(){
 	}
 }
 
-/**
- * Clears ghost and returns user back to dashboard
- */
-add_action('init', 'ghostClear');
-function ghostClear(){
-	if(isset($_GET['ghost_clear'])){
-		global $wpdb;
-		$token = $_GET['ghost_clear'];
-
-		$data = $wpdb->get_row("SELECT * FROM {$wpdb->prefix}" . GHOST_TABLE . " WHERE token='{$token}'");
-		if($data){
-			wp_set_auth_cookie($data->admin_id, true);
-			unset($_COOKIE['ghosting']);
-			setcookie('ghosting', '', time() - 3600, '/');
-		}
-	}
-}
 
 /**
  * Generates the ghosting token
@@ -192,6 +175,27 @@ function ghostAjax(){
 
 
 /**
+ * Clears ghost and returns user back to dashboard
+ */
+add_action('wp_ajax_ghost_clear', 'ghostClear');
+add_action('wp_ajax_nopriv_ghost_clear', 'ghostClear');
+function ghostClear(){
+	global $wpdb;
+	$token = $_POST['token'];
+
+	$data = $wpdb->get_row("SELECT * FROM {$wpdb->prefix}" . GHOST_TABLE . " WHERE token='{$token}'");
+	if($data){
+		wp_set_auth_cookie($data->admin_id, true);
+		unset($_COOKIE['ghosting']);
+		setcookie('ghosting', '', time() - 3600, '/');
+
+		echo admin_url();
+	}
+
+	exit();
+}
+
+/**
  * Displays the ghosting message
  *
  * @param $user
@@ -199,25 +203,46 @@ function ghostAjax(){
  */
 function ghostDisplayGhosting($user, $token){
 	?>
-	<div class="ghosting">
-		You are currently ghosting as user <?= $user; ?>. Return to admin account by clicking <a href="<?= admin_url() . '?ghost_clear=' . $token; ?>">here</a>.
-	</div>
-	<style>
-		.ghosting{
-			position:fixed;
-			z-index:9999999999999999;
-			background-color:#000;
-			padding:10px 25px;
-			color:#fff;
-			top:0;
-			left:0;
-			width:100%;
-			font-size:14px;
-		}
-		.ghosting a{
-			color:#fff;
-		}
-	</style>
+    <div class="ghosting">
+        You are currently ghosting as user <?= $user; ?>. Return to admin account by clicking <a href="#" class="ghost-clear">here</a>.
+    </div>
+    <style>
+        body{
+            padding-top:30px;
+        }
+        .ghosting{
+            position:fixed;
+            z-index:9999999999999999;
+            background-color:#000;
+            padding:10px 25px;
+            color:#fff;
+            top:0;
+            left:0;
+            width:100%;
+            font-size:14px;
+        }
+        .ghosting a{
+            color:#fff;
+        }
+    </style>
+    <script>
+        var ghost = document.querySelector('.ghost-clear');
+        ghost.addEventListener('click', function(e){
+            e.preventDefault();
+
+            fetch('<?= admin_url('admin-ajax.php'); ?>', {
+                method: 'POST',
+                body: 'action=ghost_clear&token=<?= $token; ?>',
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded"
+                }
+            }).then(function(response){
+                return response.text();
+            }).then(function(text){
+                window.location.href = text;
+            })
+        });
+    </script>
 	<?php
 }
 
